@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Niet Network Stream </title>
+    <script src="https://cdn.jsdelivr.net/npm/clappr@latest"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #fff;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+        h1 {
+            margin: 10px 0;
+        }
+        #player {
+            width: 80%;
+            max-width: 800px;
+            height: 450px;
+            border: 2px solid #444;
+            background: #000;
+            border-radius: 10px;
+}
+        input, button {
+            margin: 10px 0;
+            padding: 10px;
+            width: 60%;
+            border-radius: 5px;
+            border: none;
+            outline: none;
+        }
+        button {
+            background-color: #0078d4;
+            color: #fff;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #005a9e;
+        }
+    </style>
+</head>
+<body>
+    <h1>Niet Network Stream</h1>
+    <div id="player"></div>
+    <input type="text" id="streamUrl" placeholder="Enter Video Stream URL (RTMP, HLS, MP4)">
+    <button onclick="loadStream()">Play Video</button>
+
+    <script>
+        let player;
+
+        function loadStream() {
+            const streamUrl = document.getElementById('streamUrl').value;
+
+            // Destroy the existing player instance
+            if (player) player.destroy();
+
+            // Create a new Clappr player instance
+            player = new Clappr.Player({
+                source: streamUrl,
+                parentId: "#player",
+                autoPlay: true,
+                height: "100%",
+                width: "100%",
+                plugins: [Clappr.FlasHLS], // For legacy streams
+});
+        }
+    </script>
+</body>
+</html>
