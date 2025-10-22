@@ -3,75 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Niet Network Stream </title>
-    <script src="https://cdn.jsdelivr.net/npm/clappr@latest"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #1e1e1e;
-            color: #fff;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-        h1 {
-            margin: 10px 0;
-        }
-        #player {
-            width: 80%;
-            max-width: 800px;
-            height: 450px;
-            border: 2px solid #444;
-            background: #000;
-            border-radius: 10px;
-}
-        input, button {
-            margin: 10px 0;
-            padding: 10px;
-            width: 60%;
-            border-radius: 5px;
-            border: none;
-            outline: none;
-        }
-        button {
-            background-color: #0078d4;
-            color: #fff;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #005a9e;
-        }
-    </style>
+    <title>Live Streaming Web App</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-    <h1>Niet Network Stream</h1>
-    <div id="player"></div>
-    <input type="text" id="streamUrl" placeholder="Enter Video Stream URL (RTMP, HLS, MP4)">
-    <button onclick="loadStream()">Play Video</button>
+    <div id="video-player-container">
+        <div id="default-banner">
+            <img src="placeholder.jpg" alt="Default Banner">
+        </div>
+        <div id="shaka-container-wrapper">
+            <video id="shaka-video-player" playsinline></video>
+        </div>
+        <video id="hls-video-player" playsinline></video>
+    </div>
 
-    <script>
-        let player;
+    <div id="nav-tabs-container" role="tablist"></div>
 
-        function loadStream() {
-            const streamUrl = document.getElementById('streamUrl').value;
+    <div id="content-scroll-wrapper">
+        <input type="text" id="search-input" class="search-bar" placeholder="Search channels...">
+        <div id="content-display"></div>
+    </div>
 
-            // Destroy the existing player instance
-            if (player) player.destroy();
+    <div id="n-stream-player-section">
+        <select id="stream-type-select">
+            <option value="hls">HLS (m3u8)</option>
+            <option value="dash">DASH (mpd)</option>
+        </select>
+        <input type="url" id="stream-url-input" placeholder="Enter stream URL">
+        <button id="play-n-stream-btn">Play</button>
+    </div>
 
-            // Create a new Clappr player instance
-            player = new Clappr.Player({
-                source: streamUrl,
-                parentId: "#player",
-                autoPlay: true,
-                height: "100%",
-                width: "100%",
-                plugins: [Clappr.FlasHLS], // For legacy streams
-});
-        }
-    </script>
+    <div id="recent-streams-list"></div>
+    <button id="clear-recent-streams-btn">Clear Recent Streams</button>
+
+    <div id="policy-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="policy-title">
+        <div id="policy-modal-content">
+            <h2 id="policy-title">Privacy Policy</h2>
+            <p>This is a demo for legitimate streaming sources only. Do not use to infringe copyrights.</p>
+            <button id="policy-modal-close-btn" aria-label="Close">Close</button>
+        </div>
+    </div>
+    <button id="show-policy-btn">Show Policy</button>
+
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.ui.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/controls.css">
+    <script src="config.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
