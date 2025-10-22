@@ -1233,18 +1233,31 @@
                 loadAndDisplayChannels(tab);
             });
         });
+const searchBar = document.querySelector('.search-bar');
+searchBar.addEventListener('input', (event) => {
+    const searchTerm = event.target.value.toLowerCase();
+    
+    if (nStreamPlayerSection.classList.contains('flex')) {
+        return;
+    }
+    
+    // 👇 यहाँ से बदलाव शुरू होता है 👇
+    let channelsToDisplay; 
 
-        const searchBar = document.querySelector('.search-bar');
-        searchBar.addEventListener('input', (event) => {
-            const searchTerm = event.target.value.toLowerCase();
-            if (nStreamPlayerSection.classList.contains('flex')) {
-                return;
-            }
-            const filteredChannels = currentLoadedChannels.filter(channel =>
-                channel.name.toLowerCase().includes(searchTerm)
-            );
-            displayChannels(filteredChannels);
-        });
+    if (searchTerm === '') {
+        // अगर सर्च इनपुट खाली है, तो पूरा ओरिजिनल डेटा इस्तेमाल करो।
+        channelsToDisplay = currentLoadedChannels; 
+    } else {
+        // अगर सर्च इनपुट में कुछ है, तो फ़िल्टरिंग करो।
+        channelsToDisplay = currentLoadedChannels.filter(channel =>
+            channel.name.toLowerCase().includes(searchTerm)
+        );
+    }
+    
+    displayChannels(channelsToDisplay); 
+    // 👆 यहाँ बदलाव खत्म होता है 👆
+
+});
 
         streamTypeSelect.addEventListener('change', () => {
             if (streamTypeSelect.value === 'DASH') {
