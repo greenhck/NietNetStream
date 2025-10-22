@@ -1233,41 +1233,22 @@
                 loadAndDisplayChannels(tab);
             });
         });
+// 👇 आपके searchBar.addEventListener के अंदर यह कोड डाल दें 👇
 
-const searchBar = document.querySelector('.search-bar');
+let channelsToDisplay = []; // यहाँ पर channelsToDisplay को दोबारा declare करें (जैसा आपने किया था)
 
-searchBar.addEventListener('input', (event) => {
-    const searchTerm = event.target.value.toLowerCase();
-    
-    // ⛔️ पहला चेक, इसे रहने दें।
-    if (nStreamPlayerSection.classList.contains('flex')) {
-        return;
-    }
-    
-    // 💡 यहाँ से समाधान शुरू होता है
-    let channelsToDisplay = []; // एक खाली लिस्ट से शुरुआत करें
+if (searchTerm === '') {
+    // 💡 बदलाव: अगर इनपुट खाली है, तो हमेशा मास्टर लिस्ट दिखाओ।
+    // (masterChannelList को हमने अभी-अभी ऊपर जोड़ा है)
+    channelsToDisplay = masterChannelList; 
+} else {
+    // 💡 बदलाव: फ़िल्टरिंग भी हमेशा मास्टर लिस्ट पर ही करो।
+    channelsToDisplay = masterChannelList.filter(channel => 
+        channel.name.toLowerCase().includes(searchTerm)
+    );
+}
 
-    if (searchTerm === '') {
-        // 🟢 केस 1: अगर इनपुट खाली है, तो पूरा ओरिजिनल डेटा दिखाओ।
-        // (masterChannelList में आपका पूरा डेटा होना चाहिए)
-        channelsToDisplay = window.masterChannelList; 
-    } else {
-        // 🟢 केस 2: अगर इनपुट में कुछ है, तो फ़िल्टर करो।
-        // फ़िल्टरिंग हमेशा मास्टर लिस्ट पर ही करें ताकि पूरा डेटा मिले।
-        channelsToDisplay = window.masterChannelList.filter(channel =>
-            channel.name.toLowerCase().includes(searchTerm)
-        );
-    }
-    
-    // 🟢 केस 3: अगर फिल्टर करने के बाद भी कोई रिजल्ट नहीं है, तो channelsToDisplay 
-    // खाली रहेगा, और displayChannels() खाली लिस्ट दिखाएगा।
-    
-    // अंत में, चुना हुआ डेटा UI में दिखा दें।
-    displayChannels(channelsToDisplay);
-});
-    // UI को अपडेट करें
-    displayChannels(channelsToDisplay);
-});
+displayChannels(channelsToDisplay); // चुना हुआ डेटा दिखा दो
 
         streamTypeSelect.addEventListener('change', () => {
             if (streamTypeSelect.value === 'DASH') {
