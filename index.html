@@ -358,8 +358,11 @@
     </div>
     <!-- Removed Footer -->
 
-    <!-- JavaScript (Remaining JS is identical to the previous version and handles the logic) -->
-    <script>
+<script>
+        // --- सर्च के लिए जोड़ा गया Global Variable ---
+        let masterChannelList = []; 
+        // ----------------------------------------
+
         const contentDisplay = document.getElementById('content-display');
         const tabButtons = document.querySelectorAll('#nav-tabs-container .tab-button'); 
         const videoPlayerContainer = document.getElementById('video-player-container');
@@ -752,7 +755,7 @@
 
                 if (channel.m3u8) {
                     shakaContainerWrapper.classList.add('hidden'); 
-                    hlsVideoElement.classList.remove('hidden');    
+                    hlsVideoElement.classList.remove('hidden');  
 
                     if (Hls.isSupported()) {
                         hlsPlayer = new Hls({
@@ -781,7 +784,7 @@
                 }
                 else if (channel.mpd) {
                     shakaContainerWrapper.classList.remove('hidden'); 
-                    hlsVideoElement.classList.add('hidden');         
+                    hlsVideoElement.classList.add('hidden');      
 
                     if (!shakaPlayerInstance) {
                         passiveStopPlayer("Shaka Player त्रुटि", "Shaka Player इंस्टेंस तैयार नहीं है।");
@@ -814,8 +817,8 @@
                             
                             if (!request.uris[0].includes('__hdnea__=')) { 
                                  const separator = request.uris[0].includes('?') ? '&' : '?';
-                                request.uris[0] += separator + customCookieString; 
-                             }
+                                 request.uris[0] += separator + customCookieString; 
+                               }
                         }
                     };
 
@@ -832,7 +835,7 @@
                 setPlayerUIVisibility(false);
             }
         }
-        
+
         // --- Channel Mapping Functions ---
         function mapVootTvChannels(data) {
             if (!Array.isArray(data)) return [];
@@ -953,7 +956,11 @@
         }
 
         function displayChannels(channels) {
-            currentLoadedChannels = channels;
+            // --- बदलाव 2: यह लाइन हटा दी गई ताकि `currentLoadedChannels` हमेशा unfiltered list रहे, 
+            // या filtered list को `masterChannelList` की जगह उपयोग न करे।
+            // currentLoadedChannels = channels; 
+            // ---
+
             contentDisplay.innerHTML = '';
 
             if (channels.length === 0) {
@@ -1069,6 +1076,10 @@
                     const m3uContent = await response.text();
                     channelsToDisplay = await parseM3U(m3uContent);
                 }
+
+                // --- बदलाव 3: masterChannelList को अपडेट करें ---
+                masterChannelList = channelsToDisplay;
+                // ---
 
                 displayChannels(channelsToDisplay);
                 
@@ -1233,22 +1244,29 @@
                 loadAndDisplayChannels(tab);
             });
         });
-// 👇 आपके searchBar.addEventListener के अंदर यह कोड डाल दें 👇
 
-let channelsToDisplay = []; // यहाँ पर channelsToDisplay को दोबारा declare करें (जैसा आपने किया था)
+        const searchBar = document.querySelector('.search-bar');
+        searchBar.addEventListener('input', (event) => {
+            const searchTerm = event.target.value.toLowerCase();
+            if (nStreamPlayerSection.classList.contains('flex')) {
+                return;
+            }
 
-if (searchTerm === '') {
-    // 💡 बदलाव: अगर इनपुट खाली है, तो हमेशा मास्टर लिस्ट दिखाओ।
-    // (masterChannelList को हमने अभी-अभी ऊपर जोड़ा है)
-    channelsToDisplay = masterChannelList; 
-} else {
-    // 💡 बदलाव: फ़िल्टरिंग भी हमेशा मास्टर लिस्ट पर ही करो।
-    channelsToDisplay = masterChannelList.filter(channel => 
-        channel.name.toLowerCase().includes(searchTerm)
-    );
-}
+            // --- बदलाव 4: सर्च लॉजिक को ठीक करना ---
+            if (searchTerm === '') {
+                // अगर सर्च टर्म खाली है, तो पूरी मास्टर लिस्ट दिखाएं
+                displayChannels(masterChannelList);
+                return;
+            }
 
-displayChannels(channelsToDisplay); // चुना हुआ डेटा दिखा दो
+            // मास्टर लिस्ट में सर्च करें
+            const filteredChannels = masterChannelList.filter(channel =>
+                channel.name.toLowerCase().includes(searchTerm)
+            );
+            // सर्च किए गए चैनल दिखाएं
+            displayChannels(filteredChannels);
+            // ---
+        });
 
         streamTypeSelect.addEventListener('change', () => {
             if (streamTypeSelect.value === 'DASH') {
