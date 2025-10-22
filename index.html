@@ -1,55 +1,1398 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Streaming Web App</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-</head>
-<body>
-    <div id="video-player-container">
-        <div id="default-banner">
-            <img src="placeholder.jpg" alt="Default Banner">
-        </div>
-        <div id="shaka-container-wrapper">
-            <video id="shaka-video-player" playsinline></video>
-        </div>
-        <video id="hls-video-player" playsinline></video>
-    </div>
-
-    <div id="nav-tabs-container" role="tablist"></div>
-
-    <div id="content-scroll-wrapper">
-        <input type="text" id="search-input" class="search-bar" placeholder="Search channels...">
-        <div id="content-display"></div>
-    </div>
-
-    <div id="n-stream-player-section">
-        <select id="stream-type-select">
-            <option value="hls">HLS (m3u8)</option>
-            <option value="dash">DASH (mpd)</option>
-        </select>
-        <input type="url" id="stream-url-input" placeholder="Enter stream URL">
-        <button id="play-n-stream-btn">Play</button>
-    </div>
-
-    <div id="recent-streams-list"></div>
-    <button id="clear-recent-streams-btn">Clear Recent Streams</button>
-
-    <div id="policy-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="policy-title">
-        <div id="policy-modal-content">
-            <h2 id="policy-title">Privacy Policy</h2>
-            <p>This is a demo for legitimate streaming sources only. Do not use to infringe copyrights.</p>
-            <button id="policy-modal-close-btn" aria-label="Close">Close</button>
-        </div>
-    </div>
-    <button id="show-policy-btn">Show Policy</button>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta name="referrer" content="no-referrer" />
+    <!-- SEO Title -->
+    <title>Perelive - Fixed UI Live Stream Player</title>
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <!-- Meta Description -->
+    <meta name="description" content="Perelive par dekhein latest live channels aur streams online. Entertainment, news, sports aur more, sab ek hi platform par. Join now!">
+    <meta name="keywords" content="live streaming, online TV channels, watch live shows, Perelive, live sports, live news, free streaming, watch online, live entertainment, streaming platform">
+    <meta name="google-site-verification" content="JoSAYJv7bUeJMbgQaTPDBpBerWVfYHO60UYENKygDcs" />
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Shaka Player for DASH/DRM -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.6/controls.min.css" crossorigin="anonymous"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/shaka-player/4.7.6/shaka-player.ui.min.js" crossorigin="anonymous"></script>
+    <!-- Hls.js for HLS -->
     <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/shaka-player.ui.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/shaka-player@latest/dist/controls.css">
-    <script src="config.js"></script>
-    <script src="script.js"></script>
+    <!-- Firebase SDKs for Auth and Firestore -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, collection, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+
+        // Default Firebase Config (Fallback if not provided by environment)
+        const userFirebaseConfig = {
+            apiKey: "AIzaSyBz-v2-lbsBtk91ARf75ezB0NpWc7D0Zyg",
+            authDomain: "perelive-c0ac2.firebaseapp.com",
+            projectId: "perelive-c0ac2",
+            storageBucket: "perelive-c0ac2.firebasestorage.app",
+            messagingSenderId: "38475348473",
+            appId: "1:38475348473:web:c2c8d121216a71944be528",
+            measurementId: "G-5HCG31NZX2"
+        };
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : userFirebaseConfig;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-perelive-app';
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        window.fbApp = app;
+        window.fbAuth = auth;
+        window.fbDb = db;
+        window.fbAppId = appId;
+        window.fbServerTimestamp = serverTimestamp;
+
+        const userActivityCollection = "live_users_presence";         
+        let globalUserId = null;
+
+        async function initFirebaseAndAuth() {
+            try {
+                if (typeof __initial_auth_token !== 'undefined') {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Firebase Auth Error:", error);
+            }
+        }
+
+        function checkTimeAndHeartbeat() {
+            const now = new Date();
+            const currentHour = now.getHours(); 
+            // Skip heartbeat during late night/early morning hours (12 AM - 6 AM)
+            const isSleepTime = currentHour >= 0 && currentHour < 6;
+
+            if (isSleepTime) {
+                console.log("Sleep Time (12 AM - 6 AM): Heartbeat skipped.");
+                return; 
+            }
+
+            if (globalUserId) {
+                const userDocRef = doc(db, userActivityCollection, globalUserId);
+                setDoc(userDocRef, {
+                    last_seen: serverTimestamp(), 
+                    appId: appId
+                }, { merge: true }).catch(e => console.error("Heartbeat update failed:", e));
+            }
+        }
+
+        function setupLiveCounter() {
+            const userCountDisplay = document.getElementById('user-count-display');
+            const q = collection(db, userActivityCollection);
+
+            onSnapshot(q, (snapshot) => {
+                let activeUsers = 0;
+                // Consider users active if they've checked in within the last 2 minutes
+                const twoMinutesAgo = Date.now() - (2 * 60 * 1000);
+
+                snapshot.docs.forEach(doc => {
+                    const data = doc.data();
+                    if (data.last_seen && data.last_seen.toMillis() > twoMinutesAgo) { 
+                        activeUsers++;
+                    }
+                });
+
+                userCountDisplay.textContent = activeUsers > 0 ? activeUsers : '1'; 
+            }, (error) => {
+                console.error("Error fetching live user count:", error);
+                userCountDisplay.textContent = '...'; 
+            });
+        }
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                globalUserId = user.uid;
+                console.log("Firebase signed in. User ID:", globalUserId);
+                checkTimeAndHeartbeat();
+                setInterval(checkTimeAndHeartbeat, 60000); // 1 minute heartbeat
+                setupLiveCounter();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', initFirebaseAndAuth);
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        /* Custom styles for scrollbar in tabs */
+        .tabs-container::-webkit-scrollbar {
+            height: 0px;
+        }
+        .tabs-container::-webkit-scrollbar-thumb,
+        .tabs-container::-webkit-scrollbar-track {
+            background-color: transparent;
+        }
+        /* Loading spinner animation */
+        .loading-spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #fff;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .recent-stream-url {
+            display: block;
+            max-width: 150px;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            line-height: 1; 
+        }
+        .shaka-player-container {
+            position: relative;
+        }
+        /* High Z-index for quality selector */
+        #quality-selector {
+            z-index: 500 !important;
+        }
+        /* Custom CSS for policy modal animation */
+        #policy-modal-content {
+            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
+        }
+        /* Fixed banner background */
+        #default-banner {
+            background: linear-gradient(135deg, rgba(17, 24, 39, 0.95), rgba(31, 41, 55, 0.95));
+            backdrop-filter: blur(5px);
+        }
+        
+        /* Desktop: Ensure video player fills its 70% height/width */
+        @media (min-width: 1024px) {
+            .shaka-player-container, #shaka-video-player, #hls-video-player, #video-player-container {
+                height: 100%;
+                width: 100%;
+            }
+            /* Desktop fix for tab visual separation */
+            #right-side-combined {
+                border: 1px solid rgba(55, 65, 81, 0.5); /* Subtle border for distinction */
+            }
+        }
+        /* Ensure video elements fill their container for poster image */
+        #shaka-video-player, #hls-video-player {
+            background-color: #000; /* Black background for video */
+        }
+    </style>
+</head>
+<!-- Body: Fill viewport and use flex-col to stack content, hiding scroll on body -->
+<body class="bg-gray-900 text-gray-100 h-screen flex flex-col overflow-hidden">
+    <!-- Policy/Info Modal -->
+    <div id="policy-modal" class="hidden fixed inset-0 bg-black bg-opacity-75 z-[1000] flex items-center justify-center p-4 transition-opacity duration-300">
+        <div class="bg-gray-800 rounded-xl p-6 w-full max-w-lg shadow-2xl border-t-4 border-yellow-500 transform scale-95 opacity-0 transition-all duration-300" id="policy-modal-content">
+            <h3 class="text-2xl font-bold mb-4 text-yellow-400 flex items-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i> Important Noti
+            </h3>
+            <p class="text-gray-300 mb-4 text-sm">
+                We are serving only. We respect their policy. 
+            </p>
+            <p class="text-gray-300 mb-6 text-sm">
+                We are not host any content. All data collect from publically.
+            </p>
+            <ul class="list-disc list-inside text-sm text-gray-400 space-y-2 mb-6 bg-gray-700 p-3 rounded-lg">
+                <li><strong class="text-white">User notice:</strong> Be under the policy.</li>
+                <li><strong class="text-white">Security:</strong> We not collect any data from user.</li>
+                <li><strong class="text-white">Telegram:</strong> Join Telegram and enjoy every moment with every person.</li>
+            </ul>
+            <button id="policy-modal-close-btn" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-semibold py-2 rounded-lg transition duration-200">समझ गया (बंद करें)</button>
+        </div>
+    </div>
+
+    <!-- 1. Header Section (FIXED TOP) -->
+    <header id="main-header" class="bg-black text-white px-3 py-3 z-50 shadow-lg fixed top-0 left-0 right-0 w-full border-b border-gray-800 h-[56px] flex-shrink-0">
+        <!-- Main Row: Title, COMPACT Search, Icons -->
+        <div class="flex items-center justify-between w-full h-full">
+            <!-- 1. LEFT: Title and Live Counter -->
+            <div class="flex flex-col flex-shrink-0 mr-2">
+                <h1 class="text-xl sm:text-2xl font-extrabold tracking-wider">PERELIVE</h1>
+                <div id="active-users-counter" class="flex items-center space-x-1 pl-0.5 -mt-1">
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                    <span id="user-count-display" class="text-xs font-bold text-red-400">0</span>
+                    <span class="text-xs font-semibold text-gray-300">Live</span>
+                </div>
+            </div>
+
+            <!-- 2. CENTER: Compact Search Bar -->
+            <div class="flex-grow flex justify-center mx-1 sm:mx-2 min-w-0">
+                 <input type="text" class="search-bar w-full max-w-xs sm:max-w-md px-3 py-1.5 text-sm rounded-full border border-gray-700 bg-gray-800 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow duration-300" placeholder="चैनल/मैच खोजें...">
+            </div>
+
+            <!-- 3. RIGHT: Icons -->
+            <div class="flex items-center space-x-2 sm:space-x-3 flex-shrink-0 ml-2">
+                <a href="https://t.me/sportslivelink18" target="_blank" title="Telegram Channel Join Karein" class="text-white hover:text-blue-400 transition duration-200">
+                    <i class="fab fa-telegram-plane text-xl sm:text-2xl"></i>
+                </a>
+                <button id="show-policy-btn" title="Site Policy" class="text-white hover:text-yellow-400 transition duration-200 relative">
+                    <i class="fas fa-question-circle text-xl sm:text-2xl"></i>
+                    <span class="absolute -top-1 -right-1 flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                    </span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 2. Main Content Area (No Footer, so no bottom padding needed) -->
+    <!-- pt-[56px] for header offset. flex-grow to fill available space. overflow-hidden to contain scrolling inside. -->
+    <div id="content-area-main" class="pt-[56px] flex flex-col flex-grow lg:grid lg:grid-cols-[7fr_3fr] lg:gap-4 lg:p-4 overflow-hidden">
+        
+        <!-- 2a. LEFT PANE: Video Player (Fixed/Visible Top Left) -->
+        <div id="left-player-pane" class="flex-shrink-0 w-full aspect-video lg:aspect-auto lg:h-full lg:order-1">
+            <div id="video-player-container" class="bg-gray-900 shadow-xl w-full aspect-video relative flex-shrink-0 lg:aspect-auto lg:h-full lg:rounded-xl lg:shadow-2xl lg:overflow-hidden">
+                <!-- Default Banner (Visible on Load, Hidden when Playing) -->
+                <!-- The banner is shown only if there is no poster image set -->
+                <div id="default-banner" class="absolute inset-0 flex flex-col items-center justify-center p-4 text-center rounded-lg z-10 transition-opacity duration-500">
+                    <i class="fas fa-satellite-dish text-6xl text-blue-500 mb-4 animate-pulse"></i>
+                    <h2 class="text-3xl font-bold text-white mb-2">PERELIVE: Smooth as PereGrine</h2>
+                    <p class="text-lg text-gray-300">Choose any channel or any match</p>
+                    <p class="text-sm text-yellow-400 mt-2">If you see again this banner after play any channel. Channel not availabe.</p>
+                </div>
+
+                <!-- Player Containers (The video element will show the poster/thumbnail if available) -->
+                <div data-shaka-player-container id="shaka-container-wrapper" class="shaka-player-container w-full h-full relative hidden z-20">
+                    <!-- Quality Selector fixed to the top right of the player -->
+                    <select id="quality-selector" class="absolute top-2 right-2 z-300 bg-gray-700 text-white py-1 px-3 rounded-md text-xs font-semibold hidden cursor-pointer shadow-lg hover:bg-gray-600 transition duration-150">
+                        <option value="auto">Auto</option>
+                    </select>
+                    <video autoplay data-shaka-player id="shaka-video-player" class="w-full h-full object-contain"></video>
+                </div>
+
+                <video id="hls-video-player" class="w-full h-full object-contain hidden z-20" controls></video>
+            </div>
+        </div>
+
+        <!-- 2b. RIGHT SIDE: Tabs + Scrollable Content -->
+        <!-- Fixed height tabs section, and the scrollable content is below it. -->
+        <div id="right-side-combined" class="flex flex-col flex-grow lg:order-2 lg:h-full lg:bg-gray-800/30 lg:rounded-xl overflow-hidden">
+            
+            <!-- Tabs (FIXED/STATIC in this block - flex-shrink-0) -->
+            <!-- LG: Added bg-gray-800 to ensure visibility on desktop, just below the header line. -->
+            <nav id="nav-tabs-container" class="bg-gray-900 lg:bg-gray-800 text-white px-3 py-3 z-40 shadow-inner flex-shrink-0 w-full border-t border-gray-700 lg:border-t-0">
+                <div class="tabs-container overflow-x-auto flex justify-start items-center space-x-2">
+                    <button class="tab-button flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-full text-sm transition-all duration-200 shadow-md transform hover:scale-[1.03]" data-tab="fancode">Fancode</button>
+                    <button class="tab-button flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-full text-sm transition-all duration-200 shadow-md transform hover:scale-[1.03]" data-tab="zee-network">Zee Network</button>
+                    <button class="tab-button flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-full text-sm transition-all duration-200 shadow-md transform hover:scale-[1.03]" data-tab="pirates-tv">Pirates TV</button>
+                    <button class="tab-button flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-full text-sm transition-all duration-200 shadow-md transform hover:scale-[1.03]" data-tab="jio-tv">Jio TV</button>
+                    <button class="tab-button flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-full text-sm transition-all duration-200 shadow-md transform hover:scale-[1.03]" data-tab="pere-sports">Pere Sports</button>
+                    <button class="tab-button flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-full text-sm transition-all duration-200 shadow-md transform hover:scale-[1.03]" data-tab="sony-network">Sony Network</button>
+                    <button class="tab-button flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-full text-sm transition-all duration-200 shadow-inner transform hover:scale-[1.03]" data-tab="jiostar">Jiostar</button>
+                    <button class="tab-button flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-full text-sm transition-all duration-200 shadow-md transform hover:scale-[1.03]" data-tab="voot-tv">Voot TV</button>
+                    <button class="tab-button flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-full text-sm transition-all duration-200 shadow-md transform hover:scale-[1.03]" data-tab="opplex-tv">Opplex TV</button>
+                    <button class="tab-button flex-shrink-0 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-full text-sm transition-all duration-200 shadow-md transform hover:scale-[1.03]" data-tab="n-stream">N Stream</button>
+                </div>
+            </nav>
+
+            <!-- Main Scrollable Content Wrapper -->
+            <div id="content-scroll-wrapper" class="flex-grow w-full overflow-y-auto">
+                
+                <!-- N Stream Section (scrolls with content) -->
+                <div id="n-stream-player-section" class="bg-gray-800 p-4 sm:p-5 rounded-none shadow-xl flex-shrink-0 hidden flex-col space-y-4 border-t border-gray-700 lg:border-t-0 lg:bg-transparent">
+                    <h2 class="text-2xl font-semibold text-center">N Stream (Network Stream)</h2>
+                    <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                        <label for="stream-url-input" class="text-sm flex-shrink-0">Stream URL:</label>
+                        <input type="text" id="stream-url-input" class="w-full px-3 py-2 rounded-md bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="यहां M3U8, MPD, या लाइव प्रॉक्सी लिंक डालें">
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                        <label for="stream-type-select" class="text-sm flex-shrink-0">Stream Type:</label>
+                        <select id="stream-type-select" class="w-full sm:w-auto px-3 py-2 rounded-md bg-gray-700 border border-gray-600 text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <option value="HLS">HLS (M3U8/Generic URL)</option>
+                            <option value="DASH">DASH (MPD)</option>
+                        </select>
+                    </div>
+
+                    <div id="drm-controls" class="drm-inputs flex-col space-y-2 pl-4 border-l-2 border-gray-600 hidden">
+                        <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                            <label for="clearkey-id-input" class="text-sm">Clear Key ID:</label>
+                            <input type="text" id="clearkey-id-input" class="w-full px-3 py-2 rounded-md bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Clear Key ID (हेक्स, डैश के बिना)">
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                            <label for="clearkey-key-input" class="text-sm">Clear Key:</label>
+                            <input type="text" id="clearkey-key-input" class="w-full px-3 py-2 rounded-md bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="Clear Key (हेक्स, डैश के बिना)">
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
+                            <label for="drm-license-url-input" class="text-sm">DRM License URL:</label>
+                            <input type="text" id="drm-license-url-input" class="w-full px-3 py-2 rounded-md bg-gray-700 border border-gray-600 text-gray-100 placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="DRM लाइसेंस URL (यदि आवश्यक हो)">
+                        </div>
+                    </div>
+                    <div class="flex justify-end">
+                        <button id="play-n-stream-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-full transition-all duration-200">चलाएं</button>
+                    </div>
+
+                    <!-- Recent Streams Container -->
+                    <div id="recent-streams-container" class="mt-6 border-t border-gray-700 pt-4">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-lg font-semibold text-gray-300">Recent Streams</h3>
+                            <button id="clear-recent-streams-btn" class="text-xs text-red-400 hover:text-red-300 font-medium py-1 px-3 rounded-full border border-red-500 hover:border-red-400 transition duration-150 shadow-sm hidden" title="सभी हालिया स्ट्रीम्स हटाएँ">सभी साफ़ करें</button>
+                        </div>
+                        <div id="recent-streams-list" class="flex flex-wrap gap-3">
+                            <p id="no-recent-streams" class="text-sm text-gray-500">कोई हालिया स्ट्रीम नहीं</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Grid Display -->
+                <div id="content-display" class="content-grid grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-2 xl:grid-cols-2 gap-3 p-3 lg:p-0">
+                    <!-- Channel cards will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Removed Footer -->
+
+    <!-- JavaScript (Remaining JS is identical to the previous version and handles the logic) -->
+    <script>
+        const contentDisplay = document.getElementById('content-display');
+        const tabButtons = document.querySelectorAll('#nav-tabs-container .tab-button'); 
+        const videoPlayerContainer = document.getElementById('video-player-container');
+        const defaultBanner = document.getElementById('default-banner');
+        const shakaContainerWrapper = document.getElementById('shaka-container-wrapper'); 
+        const shakaVideoElement = document.getElementById('shaka-video-player');
+        const hlsVideoElement = document.getElementById('hls-video-player');
+        const qualitySelector = document.getElementById('quality-selector');
+        
+        // Policy Modal Elements
+        const showPolicyBtn = document.getElementById('show-policy-btn');
+        const policyModal = document.getElementById('policy-modal');
+        const policyModalContent = document.getElementById('policy-modal-content');
+        const policyModalCloseBtn = document.getElementById('policy-modal-close-btn');
+
+        let shakaPlayerInstance = null;
+        let hlsPlayer = null;
+        let currentLoadedChannels = [];
+        let currentTab = '';
+        let shakaNetworkingFilter = null;
+        
+        // --- Stability and Crash Prevention Variables ---
+        let shakaErrorCount = 0;
+        let lastShakaErrorTime = 0;
+        const MAX_ERRORS_PER_WINDOW = 5; 
+        const ERROR_WINDOW_MS = 10000;
+
+        // N Stream elements
+        const nStreamPlayerSection = document.getElementById('n-stream-player-section');
+        const streamTypeSelect = document.getElementById('stream-type-select');
+        const streamUrlInput = document.getElementById('stream-url-input');
+        const drmControls = document.getElementById('drm-controls');
+        const clearkeyIdInput = document.getElementById('clearkey-id-input');
+        const clearkeyKeyInput = document.getElementById('clearkey-key-input');
+        const drmLicenseUrlInput = document.getElementById('drm-license-url-input');
+        const playNStreamBtn = document.getElementById('play-n-stream-btn');
+        const recentStreamsList = document.getElementById('recent-streams-list');
+        const clearRecentStreamsBtn = document.getElementById('clear-recent-streams-btn');
+
+        // GitHub Raw JSON URLs 
+        const tabDataUrls = {
+            'zee-network': 'https://raw.githubusercontent.com/greenhck/batball/main/zee.json',
+            'fancode': 'https://raw.githubusercontent.com/Odfinity/live-events/refs/heads/main/fancode/data.json',
+            'pirates-tv': 'https://raw.githubusercontent.com/FunctionError/PiratesTv/main/combined_playlist.m3u',
+            'jio-tv': 'https://raw.githubusercontent.com/rocket12-18/dineshbhai/refs/heads/main/jd.m3u',
+            'pere-sports': 'https://raw.githubusercontent.com/abusaeeidx/CricHd-playlists-Auto-Update-permanent/refs/heads/main/ALL.m3u',
+            'sony-network': 'https://raw.githubusercontent.com/rocket12-18/dineshbhai/refs/heads/main/sports-pere.m3u',
+            'jiostar': 'https://raw.githubusercontent.com/alex8875/m3u/refs/heads/main/jstar.m3u',
+            'voot-tv': 'vootTvP.json',
+            'opplex-tv': 'opplexPere.json',
+            'n-stream': null,
+        };
+
+        // --- Policy Modal Logic ---
+        function togglePolicyModal(show) {
+            if (show) {
+                policyModal.classList.remove('hidden');
+                setTimeout(() => {
+                    policyModal.classList.add('opacity-100');
+                    policyModalContent.classList.add('scale-100', 'opacity-100');
+                    policyModalContent.classList.remove('scale-95', 'opacity-0');
+                }, 10);
+            } else {
+                policyModal.classList.remove('opacity-100');
+                policyModalContent.classList.remove('scale-100', 'opacity-100');
+                policyModalContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    policyModal.classList.add('hidden');
+                }, 300); 
+            }
+        }
+        if(showPolicyBtn) {
+            showPolicyBtn.addEventListener('click', () => togglePolicyModal(true));
+        }
+        if(policyModalCloseBtn) {
+            policyModalCloseBtn.addEventListener('click', () => togglePolicyModal(false));
+        }
+        if(policyModal) {
+            policyModal.addEventListener('click', (e) => {
+                if (e.target === policyModal) {
+                    togglePolicyModal(false);
+                }
+            });
+        }
+        // --- End Policy Modal Logic ---
+
+        // --- URL Management ---
+        function updateQueryParam(key, value) {
+            const url = new URL(window.location);
+            if (value) {
+                url.searchParams.set(key, value);
+            } else {
+                url.searchParams.delete(key);
+            }
+            window.history.pushState({}, '', url);
+        }
+
+        function updateChannelShareableUrl(channelName) {
+            if (channelName && currentTab !== 'n-stream') {
+                updateQueryParam('tab', currentTab);
+                updateQueryParam('channel', encodeURIComponent(channelName));
+                updateQueryParam('n', null); 
+            }
+        }
+
+        function updateNStreamShareableUrl(channelConfig) {
+            updateQueryParam('tab', 'n-stream');
+            updateQueryParam('channel', null); 
+            
+            let nParamValue = channelConfig.mpd || channelConfig.m3u8 || '';
+            let params = [];
+
+            if (channelConfig.clearkey && channelConfig.clearkey.keyId && channelConfig.clearkey.key) {
+                params.push(`drmScheme=clearkey&drmLicense=${channelConfig.clearkey.keyId}:${channelConfig.clearkey.key}`);
+            } else if (channelConfig.drm && channelConfig.drm.licenseUrl) {
+                params.push(`drmScheme=widevine&drmLicense=${encodeURIComponent(channelConfig.drm.licenseUrl)}`);
+            }
+
+            if (params.length > 0) {
+                nParamValue += `|${params.join('&')}`;
+            }
+
+            updateQueryParam('n', encodeURIComponent(nParamValue));
+        }
+        
+        // --- Player Core Functions ---
+        function setPlayerUIVisibility(isStreamPlaying) {
+            const isVideoPlayerVisible = shakaContainerWrapper.classList.contains('hidden') === false || hlsVideoElement.classList.contains('hidden') === false;
+            
+            if (isStreamPlaying) {
+                // If stream is playing, hide the banner completely
+                defaultBanner.classList.add('opacity-0');
+                setTimeout(() => defaultBanner.classList.add('hidden'), 500); 
+            } else {
+                // Not playing. Decide whether to show banner or rely on poster.
+                
+                // If no stream is playing AND the video poster is empty, show the banner
+                const hasPoster = shakaVideoElement.poster || hlsVideoElement.poster;
+
+                if (!hasPoster) {
+                    shakaContainerWrapper.classList.add('hidden');
+                    hlsVideoElement.classList.add('hidden');
+                    
+                    defaultBanner.classList.remove('hidden');
+                    setTimeout(() => defaultBanner.classList.remove('opacity-0'), 10);
+                } else {
+                    // Poster is set. Show the player container so the poster is visible, but hide the banner.
+                    defaultBanner.classList.add('hidden', 'opacity-0');
+                }
+            }
+        }
+
+        function passiveStopPlayer(title, message) {
+            console.error(`[CRASH PREVENTION ACTIVE] ${title}: ${message}`);
+
+            const currentPoster = shakaVideoElement.poster || hlsVideoElement.poster;
+
+            // Use setPlayerUIVisibility(false) to handle visual state based on current poster
+            setPlayerUIVisibility(false); 
+            
+            if (shakaPlayerInstance) {
+                shakaPlayerInstance.unload().catch(e => console.warn("Shaka Player unload failed during passive stop:", e));
+                if (shakaNetworkingFilter) {
+                    shakaPlayerInstance.getNetworkingEngine().unregisterRequestFilter(shakaNetworkingFilter);
+                    shakaNetworkingFilter = null;
+                    console.log("Custom Shaka network filter removed during passive stop.");
+                }
+            }
+            if (hlsPlayer) {
+                hlsPlayer.destroy();
+                hlsPlayer = null;
+            }
+            
+            shakaVideoElement.pause();
+            shakaVideoElement.removeAttribute('src');
+            shakaVideoElement.load(); 
+            hlsVideoElement.pause();
+            hlsVideoElement.removeAttribute('src');
+            hlsVideoElement.load(); 
+            
+            qualitySelector.innerHTML = '<option value="auto">Auto</option>';
+            qualitySelector.classList.add('hidden');
+            
+            shakaErrorCount = 0;
+            lastShakaErrorTime = 0;
+        }
+
+        function handleShakaError(event) {
+            const error = event.detail;
+            console.warn('[Shaka Error]', error);
+
+            const now = Date.now();
+            
+            if (now - lastShakaErrorTime > ERROR_WINDOW_MS) {
+                shakaErrorCount = 0;
+            }
+
+            shakaErrorCount++;
+            lastShakaErrorTime = now;
+
+            if (shakaErrorCount > MAX_ERRORS_PER_WINDOW) {
+                console.error("CRASH PREVENTION ACTIVATED: Too many errors occurred too quickly. Stopping player passively.");
+                passiveStopPlayer("क्रैश रोकथाम सक्रिय", "अत्यधिक त्रुटियों के कारण प्लेबैक को निष्क्रिय रूप से रोका जा रहा है।");
+                return; 
+            }
+        }
+
+        function handleHlsError(event, data) {
+            console.error('HLS.js Error:', data);
+            if (data.fatal) {
+                passiveStopPlayer("HLS क्रैश रोकथाम सक्रिय", "HLS स्ट्रीम में गंभीर त्रुटि हुई। निष्क्रिय रूप से रोका जा रहा है।");
+            }
+        }
+
+        document.addEventListener('shaka-ui-loaded', () => {
+            console.log('Shaka UI Loaded, initializing Shaka Player instance...');
+            shaka.polyfill.installAll();
+            const ui = shakaVideoElement['ui'];
+            const controls = ui.getControls();
+            shakaPlayerInstance = controls.getPlayer();
+            
+            shakaPlayerInstance.addEventListener('error', handleShakaError);
+
+            shakaPlayerInstance.configure({
+                streaming: {
+                    lowLatencyMode: true, 
+                    bufferingGoal: 45, 
+                    rebufferingGoal: 2,
+                    bufferBehind: 45, 
+                    retryParameters: {
+                        timeout: 15000, 
+                        maxAttempts: 7, 
+                        baseDelay: 2000, 
+                        backoffFactor: 3.0 
+                    },
+                    segmentRequestTimeout: 15000, 
+                    segmentPrefetchLimit: 2,
+                    useNativeHlsOnSafari: true
+                },
+                manifest: {
+                    retryParameters: {
+                        timeout: 10000,
+                        maxAttempts: 5
+                    }
+                }
+            });
+            console.log('Shaka Player instance initialized via UI with stability-focused config.');
+        });
+        
+        function resetPlayers() {
+            // Clear poster attributes first
+            shakaVideoElement.poster = ''; 
+            hlsVideoElement.poster = '';
+
+            // Then set UI visibility to show the default banner
+            setPlayerUIVisibility(false); 
+            
+            shakaErrorCount = 0;
+            lastShakaErrorTime = 0; 
+            
+            if (shakaPlayerInstance) {
+                shakaPlayerInstance.unload().catch(e => console.warn("Shaka Player unload failed:", e));
+                shakaPlayerInstance.configure({ drm: {} });
+
+                if (shakaNetworkingFilter) {
+                    shakaPlayerInstance.getNetworkingEngine().unregisterRequestFilter(shakaNetworkingFilter);
+                    shakaNetworkingFilter = null;
+                    console.log("Custom Shaka network filter removed during reset.");
+                }
+            }
+            if (hlsPlayer) {
+                hlsPlayer.destroy();
+                hlsPlayer = null;
+            }
+
+            shakaVideoElement.pause();
+            shakaVideoElement.removeAttribute('src');
+            hlsVideoElement.pause();
+            hlsVideoElement.removeAttribute('src');
+
+            qualitySelector.innerHTML = '<option value="auto">Auto</option>';
+            qualitySelector.classList.add('hidden');
+        }
+
+        function handlePlaybackLogic(video, isShaka, channelName = null) {
+            let hasUserInteracted = false;
+            const enableSoundOnInteraction = () => {
+                if (!hasUserInteracted) {
+                    video.muted = false;
+                    hasUserInteracted = true;
+                    video.volume = 0.8;
+                    console.log('Sound enabled after user interaction (User Clicked)');
+                }
+            };
+            ['click', 'touchstart', 'keydown'].forEach(event => {
+                document.addEventListener(event, enableSoundOnInteraction, { once: true });
+            });
+
+            video.muted = true;
+
+            const attemptAutoplay = () => {
+                video.play().then(() => {
+                    console.log('Autoplay successful (muted)!');
+                    if (channelName && currentTab !== 'n-stream') {
+                        updateChannelShareableUrl(channelName);
+                    }
+                    setPlayerUIVisibility(true);
+                }).catch(e => {
+                    console.warn('Autoplay failed, user interaction required.', e);
+                });
+            };
+
+            if (video.readyState >= 3) {
+                attemptAutoplay();
+            } else {
+                video.addEventListener('canplay', attemptAutoplay, { once: true });
+            }
+
+            if (isShaka) {
+                if (shakaPlayerInstance) {
+                    shakaPlayerInstance.addEventListener('loaded', () => {
+                        if (channelName && currentTab !== 'n-stream') {
+                            updateChannelShareableUrl(channelName);
+                        } 
+                        setPlayerUIVisibility(true);
+                    }, {once: true});
+                }
+            }
+        }
+        
+        function showMessageBox(title, message) {
+            const existingModal = document.getElementById('message-box-modal');
+            if (existingModal) existingModal.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'message-box-modal';
+            modal.className = 'fixed inset-0 bg-black bg-opacity-75 z-[1001] flex items-center justify-center p-4 transition-opacity duration-300';
+            modal.innerHTML = `
+                <div class="bg-gray-800 rounded-xl p-6 w-full max-w-sm shadow-2xl border-t-4 border-blue-500 transform scale-100 opacity-100 transition-all duration-300">
+                    <h3 class="text-xl font-bold mb-3 text-blue-400">${title}</h3>
+                    <p class="text-gray-300 mb-6 text-sm">${message}</p>
+                    <button id="message-box-close" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg transition duration-200">OK</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            document.getElementById('message-box-close').addEventListener('click', () => {
+                modal.remove();
+            });
+        }
+
+
+        async function playChannel(channel) {
+            console.log('Playing channel:', channel.name);
+            nStreamPlayerSection.classList.add('hidden'); 
+            nStreamPlayerSection.classList.remove('flex');
+
+            resetPlayers(); // This now clears poster and shows banner
+            
+            const thumbnailUrl = channel.thumbnail || '';
+            
+            // Set poster attribute. If it's a valid URL, it will display now.
+            shakaVideoElement.poster = thumbnailUrl;
+            hlsVideoElement.poster = thumbnailUrl;
+            
+            // If we have a poster, ensure the banner is hidden and the video container is visible
+            if (thumbnailUrl) {
+                shakaContainerWrapper.classList.remove('hidden');
+                hlsVideoElement.classList.add('hidden'); // Shaka container holds shaka player, which is fine for poster
+                defaultBanner.classList.add('hidden');
+            } else {
+                // If no poster, ensure banner is visible and players are hidden (resetPlayers handles visibility)
+            }
+            
+            try {
+                const fixedSpoofHeaders = {
+                    'Referer': 'https://www.jiotv.com/',
+                    'User-Agent': "plaYtv/7.1.5 (Linux;Android 13) ExoPlayerLib/2.11.6"
+                };
+
+                const requestHeaders = { ...fixedSpoofHeaders };
+
+                if (channel.customUserAgent) {
+                    requestHeaders['User-Agent'] = channel.customUserAgent;
+                }
+
+                if (channel.customCookies) {
+                    requestHeaders['Cookie'] = channel.customCookies;
+                }
+
+                if (channel.m3u8) {
+                    shakaContainerWrapper.classList.add('hidden'); 
+                    hlsVideoElement.classList.remove('hidden');    
+
+                    if (Hls.isSupported()) {
+                        hlsPlayer = new Hls({
+                            liveSyncDuration: 3,
+                            liveMaxLatencyDuration: 10,
+                            xhrSetup: function(xhr, url) {
+                                for (const header in requestHeaders) {
+                                    xhr.setRequestHeader(header, requestHeaders[header]);
+                                }
+                            }
+                        });
+                        hlsPlayer.loadSource(channel.m3u8);
+                        hlsPlayer.attachMedia(hlsVideoElement);
+                        hlsPlayer.on(Hls.Events.MANIFEST_PARSED, function() {
+                            handlePlaybackLogic(hlsVideoElement, false, channel.name);
+                        });
+                        hlsPlayer.on(Hls.Events.ERROR, handleHlsError);
+                        
+                    } else if (hlsVideoElement.canPlayType('application/vnd.apple.mpegurl')) {
+                        hlsVideoElement.src = channel.m3u8;
+                        hlsVideoElement.addEventListener('loadedmetadata', () => handlePlaybackLogic(hlsVideoElement, false, channel.name));
+                    } else {
+                        console.error('आपका ब्राउज़र HLS वीडियो चलाने का समर्थन नहीं करता है।');
+                        passiveStopPlayer("HLS संगतता त्रुटि", "आपका ब्राउज़र HLS वीडियो चलाने का समर्थन नहीं करता है।");
+                    }
+                }
+                else if (channel.mpd) {
+                    shakaContainerWrapper.classList.remove('hidden'); 
+                    hlsVideoElement.classList.add('hidden');         
+
+                    if (!shakaPlayerInstance) {
+                        passiveStopPlayer("Shaka Player त्रुटि", "Shaka Player इंस्टेंस तैयार नहीं है।");
+                        return;
+                    }
+
+                    const shakaConfig = { drm: {} };
+
+                    if (channel.clearkey && channel.clearkey.keyId && channel.clearkey.key) {
+                        const keyId = channel.clearkey.keyId.replace(/-/g, '').toLowerCase();
+                        const key = channel.clearkey.key.replace(/-/g, '').toLowerCase();
+                        shakaConfig.drm.clearKeys = { [keyId]: key };
+                    } else if (channel.drm && channel.drm.licenseUrl) {
+                        const servers = {};
+                        servers['com.widevine.alpha'] = channel.drm.licenseUrl;
+                        shakaConfig.drm.servers = servers;
+                        shakaConfig.drm.advanced = {};
+                    }
+
+                    shakaPlayerInstance.configure(shakaConfig); 
+
+                    shakaNetworkingFilter = (type, request) => {
+                        Object.assign(request.headers, requestHeaders);
+
+                        const customCookieString = requestHeaders['Cookie'];
+
+                        if (customCookieString &&
+                            (type === shaka.net.NetworkingEngine.RequestType.MANIFEST ||
+                              type === shaka.net.NetworkingEngine.RequestType.SEGMENT)) {
+                            
+                            if (!request.uris[0].includes('__hdnea__=')) { 
+                                 const separator = request.uris[0].includes('?') ? '&' : '?';
+                                request.uris[0] += separator + customCookieString; 
+                             }
+                        }
+                    };
+
+                    shakaPlayerInstance.getNetworkingEngine().registerRequestFilter(shakaNetworkingFilter);
+
+                    await shakaPlayerInstance.load(channel.mpd);
+                    handlePlaybackLogic(shakaVideoElement, true, channel.name);
+                    setupShakaQualitySelector(); 
+                } else {
+                    passiveStopPlayer("URL त्रुटि", "इस चैनल के लिए कोई मान्य स्ट्रीम URL (MPD या M3U8/Generic) नहीं मिला।");
+                }
+            } catch (e) {
+                handleShakaError({ detail: e });
+                setPlayerUIVisibility(false);
+            }
+        }
+        
+        // --- Channel Mapping Functions ---
+        function mapVootTvChannels(data) {
+            if (!Array.isArray(data)) return [];
+            return data.map(item => ({
+                name: item.channel_name || item.id,
+                logo: item.logo || 'https://placehold.co/200x150/2d3748/a0aec0?text=Voot+TV',
+                m3u8: (item.url && item.url.includes('.m3u8') && !item.url.includes('.mpd')) ? item.url : null,
+                mpd: (item.url && item.url.includes('.mpd')) ? item.url : null,
+                m3u8: item.url && !item.url.includes('.mpd') ? item.url : null,
+                clearkey: null,
+                drm: null,
+                thumbnail: item.thumbnail || '', // Added thumbnail support
+                customUserAgent: null,
+                customCookies: null
+            }));
+        }
+
+        function mapOpplexChannels(data) {
+            let allChannels = [];
+            if (typeof data !== 'object' || data === null) return [];
+
+            for (const category in data) {
+                if (Array.isArray(data[category])) {
+                    data[category].forEach(item => {
+                        const isMpd = item.url && item.url.includes('.mpd');
+                        allChannels.push({
+                            name: item.name.replace(/•●★--- Welcome ----★●•/g, 'Welcome'),
+                            logo: item.logo || 'https://placehold.co/200x150/2d3748/a0aec0?text=Opplex+TV',
+                            mpd: isMpd ? item.url : null,
+                            m3u8: !isMpd && item.url ? item.url : null,
+                            clearkey: null,
+                            drm: null,
+                            thumbnail: item.thumbnail || '', // Added thumbnail support
+                            customUserAgent: null,
+                            customCookies: null
+                        });
+                    });
+                }
+            }
+            return allChannels;
+        }
+
+        async function parseM3U(m3uContent) {
+            const lines = m3uContent.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+            const channels = [];
+            let currentChannel = {};
+
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+
+                if (line.startsWith('#EXTINF:')) {
+                    currentChannel = {
+                        name: 'Unknown Channel',
+                        logo: '',
+                        mpd: null,
+                        m3u8: null,
+                        clearkey: null,
+                        drm: null,
+                        thumbnail: '', // Added thumbnail support
+                        customUserAgent: null, 
+                        customCookies: null
+                        };
+
+                    const nameMatch = line.match(/,(.+)$/);
+                    currentChannel.name = nameMatch ? nameMatch[1].trim() : 'Unknown Channel';
+                    const logoMatch = line.match(/tvg-logo="?([^"]*)"?/i);
+                    currentChannel.logo = logoMatch && logoMatch[1] ? logoMatch[1] : '';
+                    
+                    // Added thumbnail check from M3U properties
+                    const thumbnailMatch = line.match(/tvg-logo="?([^"]*)"?/i); 
+                    currentChannel.thumbnail = thumbnailMatch && thumbnailMatch[1] ? thumbnailMatch[1] : '';
+
+                    let j = i + 1;
+                    let urlFound = false;
+
+                    while (j < lines.length) {
+                        const subLine = lines[j];
+
+                        if (subLine.startsWith('#EXTINF:')) {
+                            break;
+                        } else if (subLine.startsWith('#KODIPROP:inputstream.adaptive.license_key=')) {
+                            const clearkeyMatch = subLine.match(/license_key=([^:]+):([a-f0-9]+)/);
+                            if (clearkeyMatch) {
+                                currentChannel.clearkey = {
+                                    keyId: clearkeyMatch[1],
+                                    key: clearkeyMatch[2]
+                                };
+                            }
+                        } else if (subLine.startsWith('#EXTVLCOPT:http-user-agent=')) {
+                            const uaMatch = subLine.match(/http-user-agent=(.+)/);
+                            if (uaMatch) {
+                                currentChannel.customUserAgent = uaMatch[1].trim();
+                            }
+                        } else if (subLine.startsWith('#EXTHTTP:')) {
+                            const cookieMatch = subLine.match(/{"cookie":"([^"]+)"}/);
+                            if (cookieMatch) {
+                                currentChannel.customCookies = cookieMatch[1];
+                            }
+                        } else if (!subLine.startsWith('#') && subLine.startsWith('http')) {
+                            if (subLine.includes('.mpd')) {
+                                currentChannel.mpd = subLine;
+                            } else {
+                                currentChannel.m3u8 = subLine;
+                            }
+                            urlFound = true;
+                            i = j; 
+                            break; 
+                        }
+                        j++;
+                    }
+
+                    if (urlFound) {
+                        channels.push(currentChannel);
+                    }
+                }
+            }
+            return channels;
+        }
+
+        function displayChannels(channels) {
+            currentLoadedChannels = channels;
+            contentDisplay.innerHTML = '';
+
+            if (channels.length === 0) {
+                contentDisplay.innerHTML = `<p class="text-center text-gray-400 p-4 col-span-full">कोई चैनल/मैच नहीं मिला।</p>`;
+                contentDisplay.classList.remove('hidden');
+                return;
+            }
+            contentDisplay.classList.remove('hidden');
+            channels.forEach(channel => {
+                const channelCard = document.createElement('div');
+                channelCard.classList.add('channel-card', 'bg-gray-800', 'rounded-lg', 'overflow-hidden', 'shadow-lg', 'cursor-pointer', 'transform', 'transition-transform', 'duration-200', 'hover:-translate-y-0.5', 'hover:shadow-2xl');
+                
+                const imageUrl = channel.thumbnail || channel.logo || 'https://placehold.co/200x150/2d3748/a0aec0?text=No+Image';
+
+                channelCard.innerHTML = `
+                    <img src="${imageUrl}" onerror="this.onerror=null;this.src='https://placehold.co/200x150/2d3748/a0aec0?text=No+Image';" alt="${channel.name}" class="w-full h-24 sm:h-32 object-cover">
+                    <h3 class="p-2 text-xs sm:text-sm font-semibold text-center truncate">${channel.name}</h3>
+                `;
+                channelCard.addEventListener('click', () => {
+                    playChannel(channel);
+                    updateChannelShareableUrl(channel.name);
+                });
+                contentDisplay.appendChild(channelCard);
+            });
+        }
+
+        async function loadAndDisplayChannels(tabName, channelToPlay = null) {
+            currentTab = tabName;
+
+            const contentScrollWrapper = document.getElementById('content-scroll-wrapper');
+            
+            if (tabName === 'n-stream') {
+                nStreamPlayerSection.classList.remove('hidden');
+                nStreamPlayerSection.classList.add('flex');
+                contentDisplay.classList.add('hidden'); // Hide grid when N-Stream is active
+                loadRecentStreams();
+                
+                tabButtons.forEach(btn => {
+                    btn.classList.remove('active', 'bg-gray-600', 'hover:bg-gray-500', 'shadow-inner');
+                    btn.classList.add('bg-gray-700', 'hover:bg-gray-600', 'shadow-md');
+                    if (btn.dataset.tab === tabName) {
+                        btn.classList.add('active', 'bg-gray-600', 'hover:bg-gray-500', 'shadow-inner');
+                        btn.classList.remove('bg-gray-700', 'hover:bg-gray-600', 'shadow-md');
+                    }
+                });
+                return;
+            }
+
+            nStreamPlayerSection.classList.add('hidden');
+            nStreamPlayerSection.classList.remove('flex');
+            contentDisplay.classList.remove('hidden'); // Show grid
+            
+            tabButtons.forEach(btn => {
+                btn.classList.remove('active', 'bg-gray-600', 'hover:bg-gray-500', 'shadow-inner');
+                btn.classList.add('bg-gray-700', 'hover:bg-gray-600', 'shadow-md');
+
+                if (btn.dataset.tab === tabName) {
+                    btn.classList.add('active', 'bg-gray-600', 'hover:bg-gray-500', 'shadow-inner');
+                    btn.classList.remove('bg-gray-700', 'hover:bg-gray-600', 'shadow-md');
+                }
+            });
+
+            contentDisplay.innerHTML = `
+                <div class="flex items-center justify-center p-4 col-span-full">
+                    <div class="loading-spinner mr-3"></div>
+                    <p class="text-center text-gray-400 font-semibold">Loading channels...</p>
+                </div>
+            `;
+            
+            const dataUrl = tabDataUrls[tabName];
+            let channelsToDisplay = [];
+            
+            try {
+                const response = await fetch(dataUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP त्रुटि! स्थिति: ${response.status}। सुनिश्चित करें कि JSON फाइल (${dataUrl}) रूट फ़ोल्डर में मौजूद है और पहुंच योग्य है।`);
+                }
+
+                if (tabName === 'zee-network') {
+                    const data = await response.json();
+                    if (data && data.channels) {
+                        channelsToDisplay = data.channels.map(c => ({
+                            ...c,
+                            thumbnail: c.thumbnail || '' // ensure thumbnail property exists
+                        }));
+                    } else {
+                        throw new Error('Zee Network के लिए अमान्य डेटा संरचना।');
+                    }
+                } else if (tabName === 'fancode') {
+                    const data = await response.json();
+                    if (data && data.matches) {
+                        channelsToDisplay = data.matches.map(match => ({
+                            name: `${match.event_name}: ${match.match_name}`,
+                            logo: match.src || 'https://placehold.co/200x150/2d3748/a0aec0?text=No+Image',
+                            mpd: match.dai_url,
+                            m3u8: match.adfree_url,
+                            clearkey: null,
+                            drm: null,
+                            thumbnail: match.src || '', // Using logo as thumbnail fallback
+                            customUserAgent: null,
+                            customCookies: null
+                        }));
+                    } else {
+                        throw new Error('FanCode के लिए अमान्य डेटा संरचना।');
+                    }
+                } else if (tabName === 'voot-tv') {
+                    const data = await response.json();
+                    channelsToDisplay = mapVootTvChannels(data);
+                } else if (tabName === 'opplex-tv') {
+                    const data = await response.json();
+                    channelsToDisplay = mapOpplexChannels(data);
+                } else {
+                    const m3uContent = await response.text();
+                    channelsToDisplay = await parseM3U(m3uContent);
+                }
+
+                displayChannels(channelsToDisplay);
+                
+                if (channelToPlay) {
+                    const channel = channelsToDisplay.find(c => c.name === channelToPlay);
+                    if (channel) {
+                        console.log(`Auto-playing shared channel: ${channelToPlay}`);
+                        setTimeout(() => playChannel(channel), 100);
+                    } else {
+                        console.warn(`Shared channel "${channelToPlay}" not found in tab "${tabName}".`);
+                    }
+                }
+            } catch (error) {
+                console.error('डेटा लोड करने में त्रुटि:', error);
+                contentDisplay.innerHTML = `<p class="text-center text-red-400 p-4 font-semibold col-span-full">सामग्री लोड करने में त्रुटि हुई: ${error.message}</p>`;
+            }
+        }
+        
+        // --- Quality Selector Logic (Identical to previous version) ---
+        function setupShakaQualitySelector() {
+            if (!shakaPlayerInstance) return;
+
+            const tracks = shakaPlayerInstance.getVariantTracks();
+            qualitySelector.innerHTML = '<option value="auto">स्वचालित</option>';
+
+            const videoTracks = tracks.filter(t => t.type === 'variant' && t.height > 0).sort((a, b) => b.bandwidth - a.bandwidth);
+
+            videoTracks.forEach(track => {
+                const option = document.createElement('option');
+                option.value = track.id;
+                option.textContent = `${track.height}p (${Math.round(track.bandwidth / 1000)} Kbps)`;
+                qualitySelector.appendChild(option);
+            });
+
+            if (videoTracks.length > 1) {
+                qualitySelector.classList.remove('hidden');
+            } else {
+                qualitySelector.classList.add('hidden');
+            }
+
+            const activeTrack = shakaPlayerInstance.getVariantTracks().find(t => t.active);
+            qualitySelector.value = activeTrack ? activeTrack.id : 'auto';
+        }
+
+        qualitySelector.addEventListener('change', (e) => {
+            if (!shakaPlayerInstance) return;
+            const trackId = e.target.value;
+            if (trackId === 'auto') {
+                shakaPlayerInstance.configure({ abr: { enabled: true } });
+            } else {
+                shakaPlayerInstance.configure({ abr: { enabled: false } });
+                const track = shakaPlayerInstance.getVariantTracks().find(t => t.id == trackId);
+                if (track) {
+                    shakaPlayerInstance.selectVariantTrack(track, true);
+                }
+            }
+        });
+
+        // --- Recent Streams Logic (Identical to previous version) ---
+        function getRecentStreams() {
+            try {
+                const streams = JSON.parse(localStorage.getItem('recentNStreams') || '[]');
+                return Array.isArray(streams) ? streams : [];
+            } catch (e) {
+                console.error("Error parsing recent streams from localStorage:", e);
+                return [];
+            }
+        }
+
+        function clearRecentStreams() {
+            try {
+                localStorage.removeItem('recentNStreams');
+                console.log('Recent streams cleared.');
+                loadRecentStreams(); 
+            } catch (e) {
+                console.error("Error clearing recent streams:", e);
+            }
+        }
+
+        function saveRecentStream(channelConfig) {
+            const maxStreams = 5;
+            let streams = getRecentStreams();
+
+            const url = channelConfig.mpd || channelConfig.m3u8;
+            if (!url) return;
+
+            const simpleConfig = {
+                mpd: channelConfig.mpd,
+                m3u8: channelConfig.m3u8,
+                clearkey: channelConfig.clearkey ? { keyId: channelConfig.clearkey.keyId, key: channelConfig.clearkey.key } : null,
+                drm: channelConfig.drm ? { licenseUrl: channelConfig.drm.licenseUrl } : null,
+                thumbnail: channelConfig.thumbnail || '' // Save thumbnail for N-Stream
+            };
+
+            streams = streams.filter(s => (s.mpd || s.m3u8) !== url);
+            streams.unshift(simpleConfig);
+            streams = streams.slice(0, maxStreams);
+
+            try {
+                localStorage.setItem('recentNStreams', JSON.stringify(streams));
+                loadRecentStreams(); 
+            } catch (e) {
+                console.error("Error saving recent streams to localStorage:", e);
+            }
+        }
+
+        function loadRecentStreams() {
+            const streams = getRecentStreams();
+            recentStreamsList.innerHTML = '';
+
+            if (streams.length === 0) {
+                recentStreamsList.innerHTML = `<p id="no-recent-streams" class="text-sm text-gray-500">कोई हालिया स्ट्रीम नहीं।</p>`;
+                clearRecentStreamsBtn.classList.add('hidden'); 
+                return;
+            }
+
+            clearRecentStreamsBtn.classList.remove('hidden'); 
+
+            streams.forEach(stream => {
+                const streamUrl = stream.mpd || stream.m3u8 || 'N/A';
+                const type = stream.mpd ? 'DASH' : 'HLS';
+                const keyId = stream.clearkey ? stream.clearkey.keyId : '';
+                const key = stream.clearkey ? stream.clearkey.key : '';
+                const licenseUrl = stream.drm ? stream.drm.licenseUrl : '';
+
+                const button = document.createElement('button');
+                button.classList.add('bg-gray-700', 'hover:bg-gray-600', 'text-white', 'py-2', 'px-3', 'rounded-lg', 'text-sm', 'transition-all', 'duration-200', 'shadow-md', 'flex', 'flex-col', 'items-start');
+
+                button.innerHTML = `
+                    <span class="font-semibold text-blue-300">${type} Stream</span>
+                    <span class="text-xs text-gray-400 recent-stream-url" title="${streamUrl}">${streamUrl}</span>
+                `;
+
+                button.addEventListener('click', () => {
+                    streamUrlInput.value = streamUrl;
+                    streamTypeSelect.value = type;
+                    clearkeyIdInput.value = keyId;
+                    clearkeyKeyInput.value = key;
+                    drmLicenseUrlInput.value = licenseUrl;
+
+                    const changeEvent = new Event('change');
+                    streamTypeSelect.dispatchEvent(changeEvent);
+
+                    playNStreamBtn.click();
+                });
+
+                recentStreamsList.appendChild(button);
+            });
+        }
+        
+        // --- Event Listeners and Initialization ---
+
+        tabButtons.forEach(button => {
+            button.addEventListener('click', (event) => {
+                const tab = event.target.dataset.tab;
+
+                updateQueryParam('tab', tab);
+                updateQueryParam('channel', null);
+                updateQueryParam('n', null);
+                localStorage.setItem('activeTab', tab);
+
+                loadAndDisplayChannels(tab);
+            });
+        });
+
+        const searchBar = document.querySelector('.search-bar');
+        searchBar.addEventListener('input', (event) => {
+            const searchTerm = event.target.value.toLowerCase();
+            if (nStreamPlayerSection.classList.contains('flex')) {
+                return;
+            }
+            const filteredChannels = currentLoadedChannels.filter(channel =>
+                channel.name.toLowerCase().includes(searchTerm)
+            );
+            displayChannels(filteredChannels);
+        });
+
+        streamTypeSelect.addEventListener('change', () => {
+            if (streamTypeSelect.value === 'DASH') {
+                drmControls.classList.remove('hidden');
+                drmControls.classList.add('flex');
+            } else {
+                drmControls.classList.add('hidden');
+                drmControls.classList.remove('flex');
+                clearkeyIdInput.value = '';
+                clearkeyKeyInput.value = '';
+                drmLicenseUrlInput.value = '';
+            }
+        });
+
+        clearRecentStreamsBtn.addEventListener('click', clearRecentStreams);
+
+        playNStreamBtn.addEventListener('click', () => {
+            const streamUrl = streamUrlInput.value.trim();
+            const streamType = streamTypeSelect.value;
+
+            let channelConfig = {
+                name: 'N Stream Custom Playback',
+                logo: '',
+                mpd: null,
+                m3u8: null,
+                clearkey: null,
+                drm: null,
+                thumbnail: ''
+            };
+
+            if (!streamUrl) {
+                console.error('कृपया स्ट्रीम URL डालें।');
+                showMessageBox("URL आवश्यक", "कृपया 'स्ट्रीम URL' इनपुट फ़ील्ड में एक मान्य पता डालें।");
+                return;
+            }
+
+            // N-Stream does not inherently have a thumbnail, but we can allow the user to manually set one if desired.
+            // For simplicity, we just check if the input URL might be a thumbnail itself, or allow it to be blank.
+            // Since we don't have a separate thumbnail input for N-Stream, the thumbnail remains blank.
+            
+            if (streamType === 'HLS') {
+                channelConfig.m3u8 = streamUrl;
+            } else if (streamType === 'DASH') {
+                channelConfig.mpd = streamUrl;
+                const clearkeyId = clearkeyIdInput.value.trim();
+                const clearkeyKey = clearkeyKeyInput.value.trim();
+                const drmLicenseUrl = drmLicenseUrlInput.value.trim();
+
+                if (clearkeyId && clearkeyKey) {
+                    channelConfig.clearkey = {
+                        keyId: clearkeyId,
+                        key: clearkeyKey
+                    };
+                }
+                if (drmLicenseUrl) {
+                    channelConfig.drm = {
+                        type: 'widevine',
+                        licenseUrl: drmLicenseUrl
+                    };
+                }
+            }
+
+            playChannel(channelConfig);
+            saveRecentStream(channelConfig);
+            updateNStreamShareableUrl(channelConfig);
+        });
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const nParam = urlParams.get('n');
+            const sharedTab = urlParams.get('tab');
+            const sharedChannel = urlParams.get('channel');
+
+            let tabToActivate = sharedTab || localStorage.getItem('activeTab') || 'pere-sports';
+            
+            if (nParam) {
+                tabToActivate = 'n-stream';
+                const nValue = decodeURIComponent(nParam);
+
+                let streamUrl = nValue;
+                let clearkeyId = '';
+                let clearkeyKey = '';
+                let drmLicenseUrl = '';
+                let streamType = 'HLS';
+
+                const parts = nValue.split('|');
+                streamUrl = parts[0];
+
+                if (parts.length > 1) {
+                    const params = new URLSearchParams(parts[1]);
+
+                    const drmScheme = params.get('drmScheme');
+                    if (drmScheme === 'clearkey') {
+                        const license = params.get('drmLicense');
+                        if (license) {
+                            const [kid, key] = license.split(':');
+                            clearkeyId = kid;
+                            clearkeyKey = key;
+                            streamType = 'DASH';
+                        }
+                    } else if (drmScheme === 'widevine') {
+                        drmLicenseUrl = params.get('drmLicense');
+                        streamType = 'DASH';
+                    }
+                } else if (streamUrl.includes('.mpd')) {
+                    streamType = 'DASH';
+                }
+
+                const nStreamTabButton = document.querySelector('.tab-button[data-tab="n-stream"]');
+                if (nStreamTabButton) {
+                    currentTab = 'n-stream';
+                    updateQueryParam('tab', 'n-stream');
+                    loadAndDisplayChannels('n-stream'); 
+
+                    setTimeout(() => {
+                        streamUrlInput.value = streamUrl;
+                        streamTypeSelect.value = streamType;
+
+                        const changeEvent = new Event('change');
+                        streamTypeSelect.dispatchEvent(changeEvent);
+
+                        clearkeyIdInput.value = clearkeyId;
+                        clearkeyKeyInput.value = clearkeyKey;
+                        drmLicenseUrlInput.value = drmLicenseUrl;
+
+                        playNStreamBtn.click(); 
+                    }, 100);
+                }
+            }
+            else if (sharedTab && sharedChannel) {
+                const tabButton = document.querySelector(`.tab-button[data-tab="${sharedTab}"]`);
+                if (tabButton) {
+                    loadAndDisplayChannels(sharedTab, decodeURIComponent(sharedChannel));
+                }
+            }
+            else {
+                const defaultButton = document.querySelector(`.tab-button[data-tab="${tabToActivate}"]`);
+                if (defaultButton) {
+                    loadAndDisplayChannels(tabToActivate);
+                } else {
+                    loadAndDisplayChannels('jio-tv');
+                }
+            }
+
+            // Initial reset to ensure banner is visible if no auto-play happens
+            resetPlayers();
+        });
+    </script>
+    <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "68a40879f6b244629841d4be7aec5e0f"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>
