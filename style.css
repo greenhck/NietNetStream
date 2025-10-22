@@ -1,0 +1,109 @@
+/* 기본 스타일 */
+body {
+    background-color: #0f0f0f;
+    color: white;
+    font-family: sans-serif;
+    margin: 0;
+}
+
+/* 비디오 플레이어 */
+#video-player-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background-color: black;
+}
+
+#default-banner {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#shaka-container-wrapper, #hls-video-player {
+    width: 100%;
+    height: 100%;
+}
+
+/* 탭 */
+#nav-tabs-container {
+    display: flex;
+    overflow-x: auto;
+    background-color: #212121;
+    border-bottom: 1px solid #303030;
+}
+
+.tab-button {
+    padding: 15px 25px;
+    cursor: pointer;
+    background-color: transparent;
+    border: none;
+    color: white;
+    font-size: 16px;
+}
+
+.tab-button.active {
+    border-bottom: 2px solid #FF0000;
+}
+
+/* 채널 카드 */
+#content-display {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+    padding: 20px;
+}
+
+.channel-card {
+    background-color: #181818;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+.channel-card:hover {
+    transform: scale(1.05);
+}
+
+.channel-card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+}
+
+.channel-card .name {
+    padding: 10px;
+    font-weight: bold;
+}
+
+/* 기타 UI */
+.search-bar, #stream-url-input, #stream-type-select, button {
+    padding: 10px;
+    margin: 10px;
+    border-radius: 5px;
+    border: 1px solid #303030;
+    background-color: #212121;
+    color: white;
+}
+
+/* 모달 */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.7);
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+#policy-modal-content {
+    background-color: #181818;
+    padding: 20px;
+    border-radius: 8px;
+}
